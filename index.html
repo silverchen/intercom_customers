@@ -1,0 +1,138 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<!--
+	Author: Silver Chen
+-->
+
+<html>
+	<head>
+		<title>Intercom Customers within 100km</title>
+		<script type="text/javascript" src="great_circle.js"></script>
+		<script type="text/javascript" src="user_model.js"></script>
+		<script type="text/javascript">
+			const _DUBLIN_OFFICE_COORDINATES = {lat: 53.339428, lon: -6.257664};
+			const _DISTANCE = 100;
+
+			function isWithinDistance({ lat1=0, lon1=0, lat2=0, lon2=0, distance=0, unit='KM' } = {}) {
+			    return GreatCircle.distance(lat1, lon1, lat2, lon2, unit) <= distance;
+			}
+
+			function binaryInsert(user, array, startVal, endVal){
+				var length = array.length;
+				var start = typeof(startVal) != 'undefined' ? startVal : 0;
+				var end = typeof(endVal) != 'undefined' ? endVal : length - 1;
+				var m = start + Math.floor((end - start)/2);
+
+				if (length == 0) {
+					array.push(user);
+					return;
+				}
+
+				if (user.id > array[end].id) {
+					array.splice(end + 1, 0, user);
+					return;
+				}
+
+				if (user.id < array[start].id) {
+					array.splice(start, 0, user);
+					return;
+				}
+
+				if (start >= end) {
+					return;
+				}
+
+				if (user.id < array[m].id) {
+					binaryInsert(user, array, start, m - 1);
+					return;
+				}
+
+				if (user.id > array[m].id) {
+					binaryInsert(user, array, m + 1, end);
+					return;
+				}
+			}
+
+			function printResult(results, obj) {
+				for (i = 0; i < results.length; i++) { 
+		        	obj.innerHTML += '<p>' + results[i].id + ', ' + results[i].name + '</p>'; 
+		        }
+			}
+
+			var XMLHttpRequestObject = false; 
+	      	if (window.XMLHttpRequest) {
+	        	XMLHttpRequestObject = new XMLHttpRequest();
+	      	} else if (window.ActiveXObject) {
+	        	XMLHttpRequestObject = new ActiveXObject("Microsoft.XMLHTTP");
+	      	}
+
+	      	function getData(dataSource, divId) {
+	        	if(XMLHttpRequestObject) {
+	          		XMLHttpRequestObject.open("GET", dataSource); 
+
+	          		var statusDiv = document.getElementById("statusDiv");
+	          		var resultDiv = document.getElementById(divId);
+	          		var showMeBtn = document.getElementById("showMe");
+	          		statusDiv.style.display = "block";
+	          		resultDiv.style.display = "none";
+	          		showMeBtn.style.display = "none";
+
+	          		XMLHttpRequestObject.onreadystatechange = function() {
+	          			if (XMLHttpRequestObject.readyState == 4) {
+	          				statusDiv.style.display = "none";
+	          				resultDiv.style.display = "block";
+	          				showMeBtn.style.display = "block";
+
+	          				if (XMLHttpRequestObject.status == 200) {
+		            			if (XMLHttpRequestObject.responseText) {
+		            				var results = [];
+		            				var lines = XMLHttpRequestObject.responseText.split("\n");
+
+		            				for (i = 0; i < lines.length; i++) {
+		            					try {
+									        var json = JSON.parse(lines[i]);
+								            if (json) {
+								            	var user = UserModel.init(json);
+
+											    if (user.lat && user.lon && user.id) {
+											    	var isUserWithinDistance = isWithinDistance({
+											    		lat1: _DUBLIN_OFFICE_COORDINATES.lat, 
+											    		lon1: _DUBLIN_OFFICE_COORDINATES.lon, 
+											    		lat2: user.lat, 
+											    		lon2: user.lon, 
+											    		distance: _DISTANCE});
+
+											    	if (isUserWithinDistance) {
+											    		binaryInsert(user, results);
+											    	}
+											    }
+											}
+									    } catch(e) {
+									        console.log("Error: ", e); 
+									    }
+							        }
+
+							        printResult(results, resultDiv);
+								}
+		            		} else {  
+					           console.log("Error: ", XMLHttpRequestObject.statusText);  
+					        } 
+	          			}
+	          		}
+
+	          		XMLHttpRequestObject.send(null); 
+	        	}
+	      	}
+		</script>
+	</head>
+
+	<body>
+		<h3>Show the user ids and names of matching customers within 100km of Dublin office.</h3>
+		<p id="showMe"><a href="#" onClick="getData('https://gist.githubusercontent.com/brianw/19896c50afa89ad4dec3/raw/6c11047887a03483c50017c1d451667fd62a53ca/gistfile1.txt', 'targetDiv')">Show Me</a></p>
+		<div id="statusDiv" style="display: none">Loading...</div>
+		<div id="targetDiv" style="display: none">
+			<br/>
+	     	<p>Results:</p> 
+	    </div> 
+	</body>
+</html>
